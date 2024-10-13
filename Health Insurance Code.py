@@ -2,10 +2,13 @@ import pandas as pd
 import seaborn as sbn
 import matplotlib.pyplot as plt
 from scipy import stats
+from scipy.stats import mannwhitneyu
 from scipy.stats import spearmanr 
+from scipy.stats import pearsonr
+from scipy.stats import chi2_contingency
 
 # Load dataset
-df = pd.read_excel(r"C:\WGU\D599\Task 2\Health Insurance Dataset.xlsx")
+df = pd.read_excel(r"C:\Users\merie\OneDrive\Bureau\WGU\D599\Task2-D599\Health Insurance Dataset.xlsx")
 
 ## Part 1
 # Continuous variable: Age
@@ -89,10 +92,20 @@ plt.xlabel('Age')
 plt.ylabel('bmi') 
 plt.show()
 
-# Contingency table for sex vs Smoker 
+#Pearson Correlation
+correlation, p_value = pearsonr(df['age'], df['bmi'])
+print(f'Pearson correlation coefficient: {correlation}')
+print(f'p_value:{p_value}')
+
+#Contingency table for sex vs Smoker 
 contingency_table = pd.crosstab(df['sex'], df['smoker']) 
 print("\nContingency Table (sex vs Smoker)")
 print(contingency_table)
+
+# Chi-square test 
+chi_stat, p, dof, expected = chi2_contingency(contingency_table)
+print(f"\nChi-square test statistic: {chi_stat:.2f}, P-value: {p:.5f}")
+
 
 # Boxplot for bmi vs Smoker
 plt.figure(figsize=(8, 8)) 
@@ -102,33 +115,46 @@ plt.xlabel('bmi')
 plt.ylabel('Smoker') 
 plt.show()
 
+#Statistics
+print(df.groupby('smoker')['bmi'].describe())
+
+
 ## Part 2: Parametric Statistical Testing
-
-# Check data type of all columns
-print(df.dtypes)
-
-# Convert charges to numeric, coercing errors to NaN
-df['charges'] = pd.to_numeric(df['charges'], errors='coerce')
-# Verify the conversion
-print("Data type of charges after conversion:", df['charges'].dtype)
-
-# Create two groups based on smoking status
-smokers = df[df['smoker'] == 'yes']['charges']
-non_smokers = df[df['smoker'] == 'no']['charges']
-
-# Perform the independent samples t-test
-t_statistic, p_value = stats.ttest_ind(smokers, non_smokers, equal_var=False)
-
-# Print results 
-print(f"T-statistic: {t_statistic}") 
-print(f"P-value: {p_value}")
-
-if p_value < 0.05:
-    print("There is a significant difference in insurance charges between smokers and non-smokers.")
+# Check BMI variable
+if len(df['bmi'].unique()) == 1:
+    print("All BMI values are identical, Shapiro-Wilk cannot run.")
 else:
-    print("There is no significant difference in insurance charges between smokers and non-smokers.")
+    # Perform the Shapiro-Wilk test for normality on the BMI data
+    shapiro_stat, p_value = stats.shapiro(df['bmi'])
+    
+    # Output the results
+    print(f'Shapiro-Wilk Test Statistics={shapiro_stat}, p-value={p_value}')
+    
+    # Interpret the result
+    if p_value <= 0.05:
+        print("BMI does not appear to be normally distributed (p <= 0.05).")
+    else:
+        print("BMI appears to be normally distributed (p > 0.05).")
+
+# Group the BMI values by patient levels
+grouped_bmi = [group['bmi'].values for name, group in df.groupby('Level')]
+
+# Perform ANOVA test
+f_statistic, p_value_anova = stats.f_oneway(*grouped_bmi)
+
+# Print ANOVA results
+print(f'ANOVA F-statistic: {f_statistic}, p-value: {p_value_anova}')
+
+# Interpret the ANOVA results
+if p_value_anova < 0.05:
+    print("There is a significant difference in BMI across different patient levels.")
+else:
+    print("There is no significant difference in BMI across different patient levels.")
 
 # Part 3: Nonparametric Statistical Testing
+
+# Ensure 'charges' column is numeric
+df['charges'] = pd.to_numeric(df['charges'], errors='coerce')
 
 # Perform the Mann-Whitney U test
 # Filter the data by gender
